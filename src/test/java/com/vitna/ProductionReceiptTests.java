@@ -1,0 +1,29 @@
+package com.vitna;
+import com.vitna.Domain.*;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.*;
+import static org.junit.jupiter.api.Assertions.*;
+
+@SpringBootTest @Transactional
+class ProductionReceiptTests {
+ @Autowired Api api; @Autowired ProductionApi productionApi; @Autowired ProductionSteps steps; @Autowired Accounts accounts; @Autowired Products products;
+ Account account(Role role){Account a=new Account();a.email=UUID.randomUUID()+"@test.pe";a.name=role.name();a.role=role;return accounts.save(a);}
+ Authentication auth(Account a){return new UsernamePasswordAuthenticationToken(a.email,"unused");}
+ Product product(){Product p=new Product();p.sku="RECEIPT-"+UUID.randomUUID();p.name="Cereal";p.category="Cereales";p.presentation="250 g";p.description="Prueba";p.price=new BigDecimal("12.50");p.published=true;return products.save(p);}
+ long finished(Product p,Account chief,Account worker){var plan=(Map<?,?>)productionApi.plan(new ProductionApi.Plan(p.id,new BigDecimal("5"),"Empaque",worker.id),auth(chief));long id=((Number)plan.get("id")).longValue();long step=steps.findByProductionIdOrderByStepPosition(id).get(0).id;productionApi.advance(id,step,new ProductionApi.Advance("START",null),auth(worker));productionApi.advance(id,step,new ProductionApi.Advance("COMPLETE",new BigDecimal("4.5")),auth(worker));return id;}
+ Api.LotRequest receipt(Product p,long productionId,String code,BigDecimal quantity){return new Api.LotRequest(p.id,code,"Productos terminados",LocalDate.now().plusDays(20),quantity,productionId);}
+ @Test void manufacturingOnlyBecomesStockAfterReceiptAndQualityRelease(){Account chief=account(Role.JEFE_PRODUCCION),worker=account(Role.TRABAJADOR),warehouse=account(Role.ALMACENERO),quality=account(Role.CALIDAD),client=account(Role.CLIENTE);Product p=product();long id=finished(p,chief,worker);api.products(auth(client));assertEquals(0,p.availableStock.signum());var pending=(List<?>)api.productionReceipts(auth(warehouse));assertTrue(pending.stream().anyMatch(r->((Map<?,?>)r).get("id").equals(id)));Lot lot=api.receive(receipt(p,id,"OUT-001",new BigDecimal("4.5")),auth(warehouse));assertEquals("CUARENTENA",lot.status);assertEquals(id,lot.productionId);api.products(auth(client));assertEquals(0,p.availableStock.signum());assertThrows(ResponseStatusException.class,()->api.receive(receipt(p,id,"OUT-002",new BigDecimal("4.5")),auth(warehouse)));assertFalse(((List<?>)api.productionReceipts(auth(warehouse))).stream().anyMatch(r->((Map<?,?>)r).get("id").equals(id)));api.quality(lot.id,Map.of("status","APROBADO","note","Revisión conforme"),auth(quality));api.products(auth(client));assertEquals(0,new BigDecimal("4.5").compareTo(p.availableStock));}
+ @Test void receiptMustMatchProductAndCompleteQuantity(){Account chief=account(Role.JEFE_PRODUCCION),worker=account(Role.TRABAJADOR),warehouse=account(Role.ALMACENERO);Product p=product(),other=product();long id=finished(p,chief,worker);assertThrows(ResponseStatusException.class,()->api.receive(receipt(other,id,"BAD-PRODUCT",new BigDecimal("4.5")),auth(warehouse)));assertThrows(ResponseStatusException.class,()->api.receive(receipt(p,id,"BAD-QTY",BigDecimal.ONE),auth(warehouse)));assertThrows(ResponseStatusException.class,()->api.productionReceipts(auth(worker)));}
+ @Test void fractionalCheckoutTotalsUseConsistentCentRounding(){Product p=product();Account warehouse=account(Role.ALMACENERO),quality=account(Role.CALIDAD),client=account(Role.CLIENTE);Lot lot=api.receive(new Api.LotRequest(p.id,"MONEY-TEST","Almacén",LocalDate.now().plusDays(20),BigDecimal.TEN,null),auth(warehouse));api.quality(lot.id,Map.of("status","APROBADO"),auth(quality));var order=(Map<?,?>)api.checkout(new Api.Checkout(" Dirección ",List.of(new Api.Item(p.id,new BigDecimal("0.33")))),auth(client));assertEquals("Dirección",order.get("address"));assertEquals(new BigDecimal("4.13"),order.get("total"));var item=(Map<?,?>)((List<?>)order.get("items")).get(0);assertEquals(order.get("total"),item.get("subtotal"));}
+ @Test void repeatedLotCodesForSameProductAreRejected(){Product p=product();Account warehouse=account(Role.ALMACENERO);api.receive(new Api.LotRequest(p.id,"  lot-a  ","Almacén",LocalDate.now().plusDays(10),BigDecimal.TEN,null),auth(warehouse));assertThrows(ResponseStatusException.class,()->api.receive(new Api.LotRequest(p.id,"LOT-A","Almacén B",LocalDate.now().plusDays(20),BigDecimal.ONE,null),auth(warehouse)));}
+ @Test void emailCaseDoesNotCreateDuplicateAccountsAndLegacyLoginWorks(){Account admin=account(Role.ADMIN),client=account(Role.CLIENTE);client.passwordHash="test-hash";assertThrows(ResponseStatusException.class,()->api.createUser(new Api.UserRequest("Duplicado",client.email.toUpperCase(Locale.ROOT),"PasswordForTest!",Role.CLIENTE,null,null,null),auth(admin)));var user=new Security().users(accounts).loadUserByUsername(" "+client.email.toUpperCase(Locale.ROOT)+" ");assertEquals(client.email,user.getUsername());}
+ @Test void stalePriceQuoteIsRejected(){Product p=product();Account warehouse=account(Role.ALMACENERO),quality=account(Role.CALIDAD),client=account(Role.CLIENTE);Lot lot=api.receive(new Api.LotRequest(p.id,"QUOTE-TEST","Almacén",LocalDate.now().plusDays(20),BigDecimal.TEN,null),auth(warehouse));api.quality(lot.id,Map.of("status","APROBADO"),auth(quality));assertThrows(ResponseStatusException.class,()->api.checkout(new Api.Checkout("Dirección",List.of(new Api.Item(p.id,BigDecimal.ONE,new BigDecimal("10")))),auth(client)));}
+}
