@@ -17,9 +17,10 @@ import java.util.List;
   return http.authorizeHttpRequests(a->a.requestMatchers("/api/public/**","/api/csrf").permitAll().anyRequest().authenticated())
    .formLogin(f->f.loginProcessingUrl("/api/login").usernameParameter("email")
     .successHandler((q,s,a)->{s.setContentType("application/json");s.getWriter().write("{\"ok\":true}");})
-    .failureHandler((q,s,e)->s.sendError(401,"Credenciales incorrectas")))
+    .failureHandler((q,s,e)->{s.setStatus(401);s.setContentType("application/json");s.getWriter().write("{\"message\":\"Credenciales incorrectas o cuenta inactiva\"}");}))
    .logout(l->l.logoutUrl("/api/logout").logoutSuccessHandler((q,s,a)->s.setStatus(204)))
-   .exceptionHandling(e->e.authenticationEntryPoint((q,s,x)->s.sendError(401))).build();
+   .exceptionHandling(e->e.authenticationEntryPoint((q,s,x)->{s.setStatus(401);s.setContentType("application/json");s.getWriter().write("{\"message\":\"Debes iniciar sesion\"}");})
+    .accessDeniedHandler((q,s,x)->{s.setStatus(403);s.setContentType("application/json");s.getWriter().write("{\"message\":\"Solicitud rechazada. Recarga la pagina para renovar la sesion y el token CSRF; verifica tus permisos\"}");})).build();
  }
 }
 
