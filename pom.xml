@@ -80,6 +80,7 @@
 			<plugin>
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>
+				<configuration><mainClass>com.vitna.VitnaApplication</mainClass></configuration>
 			</plugin>
 		</plugins>
 	</build>

@@ -19,6 +19,32 @@ No consultar ni compartir password_hash. Si no existe la cuenta pero hay otras c
 
 No borrar tablas, volúmenes ni desactivar CSRF. No habilitar demo en producción. La validez de una contraseña real solo puede verificarla el propietario al iniciar sesión; las pruebas de integración usan identidades sintéticas.
 
+## Verificacion dentro del backend y recuperacion del propietario
+
+VITNA usa formLogin de Spring Security, BCrypt y sesion JSESSIONID, no JWT. El formulario envia email/password como application/x-www-form-urlencoded. El navegador llama al mismo origen Vercel /api; no falta una variable CORS ni un token JWT.
+
+Tras desplegar el commit que incorpora AdminAccessTool, abrir una terminal interactiva dentro de vitna_back con Railway CLI autenticado:
+
+```sh
+railway ssh --service vitna_back --environment production
+```
+
+Dentro de esa terminal ejecutar (sin pegar contrasenas):
+
+```sh
+java -Dloader.main=com.vitna.AdminAccessTool -cp /app/vitna.jar org.springframework.boot.loader.launch.PropertiesLauncher --check-bootstrap
+```
+
+Este modo compara VITNA_ADMIN_PASSWORD actual con el hash de la cuenta en la misma base DB_URL que usa el servidor. Solo muestra MATCH o MISMATCH. MISMATCH demuestra que cambiar la variable no sincronizo la cuenta; no prueba que la contrasena que recuerdas sea incorrecta.
+
+Para comprobar la contrasena que intentas utilizar, cambiar --check-bootstrap por --verify. La pide de forma oculta en la terminal; no pasarla en argumentos ni compartirla. MATCH confirma coincidencia BCrypt, sin modificar datos. Si devuelve MATCH pero el login falla, revisar la respuesta exacta y que la terminal corresponda al servicio/entorno/instancia del dominio publico antes de cambiar datos.
+
+Si necesitas recuperar acceso, obtener respaldo primero. Solo el propietario, al decidir cambiar la contrasena, puede ejecutar el mismo comando con --reset. Pide nueva contrasena oculta dos veces y la confirmacion literal RESET admin@vitna.pe. Actualiza exclusivamente el hash de la cuenta ADMIN activa existente y detecta cambios concurrentes. No crea cuentas, no activa cuentas y no modifica pedidos. No se ejecuta automaticamente al desplegar. Reiniciar backend despues para invalidar sesiones anteriores y luego entrar desde Vercel con la nueva contrasena. Esta operacion no actualiza VITNA_ADMIN_PASSWORD; la variable es solo bootstrap.
+
+El ejecutable y el modo de solo lectura se validaron localmente en PostgreSQL aislado con valores sinteticos; no se ha ejecutado recuperacion en produccion ni accedido a secretos del usuario.
+
+Referencia: [terminal de servicio Railway](https://docs.railway.com/cli/ssh).
+
 ## Comprobación mínima de la cuenta existente
 
 Ejecutar diagnose-admin.sql en la base Postgres del mismo entorno que vitna_back. La consulta es de solo lectura y no devuelve hashes ni contraseñas. BCRYPT_FORMAT solo confirma estructura, no verifica que una contraseña coincida.
