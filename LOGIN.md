@@ -11,6 +11,16 @@ En el servicio vitna_back, Variables, agregar VITNA_AUTH_DIAGNOSTICS=true y desp
 
 Compartir solo esa linea del diagnostico. Desactivar la variable despues. No pegar secretos en SQL; el editor PostgreSQL no ejecuta comandos Java o Railway CLI.
 
+Si BOOTSTRAP_MATCH aparece pero login devuelve 401, mantener temporalmente la misma variable y realizar un intento normal desde el formulario despues de desplegar. Buscar VITNA_LOGIN_DIAGNOSTIC en Deploy Logs:
+
+- EMAIL_FIELD_MISSING / PASSWORD_FIELD_MISSING: el servidor no recibio el campo requerido.
+- EMAIL_DIFFERS_FROM_BOOTSTRAP_ADMIN: el formulario envio un correo distinto del administrador inicial.
+- SUBMITTED_PASSWORD_MISMATCH: la contrasena recibida en el POST no coincide con el hash almacenado; no se registra su valor. Escribir de nuevo la contrasena correcta, revisar autocompletado y espacios sin modificar la base.
+- PASSWORD_MATCH_PROVIDER_REJECTED: la comprobacion BCrypt directa coincide pero el proveedor rechazo el acceso; compartir la categoria provider que acompana la linea para investigar.
+- ACCOUNT_CHECK_FAILED / ACCOUNT_INACTIVE / ADMIN_NOT_FOUND: revisar consulta o estado de la cuenta.
+
+El diagnostico es de solo lectura, no registra correo recibido, contrasena, hash, cookie ni token. No utilizar debug HTTP que pueda registrar el cuerpo del formulario.
+
 El administrador inicial usa **admin@vitna.pe**. Se crea únicamente cuando la tabla accounts está vacía y VITNA_ADMIN_PASSWORD tiene al menos 10 caracteres. La contraseña se almacena con BCrypt. Modificar esa variable y volver a desplegar NO actualiza una cuenta existente. Las cuentas demo del equipo local no se copian a Railway.
 
 Desde el frontend real, /api/csrf debe devolver JSON y establecer JSESSIONID bajo el dominio Vercel. Una respuesta 401 de /api/me sin sesión es normal. Un 401 de login con CSRF válido indica credenciales no aceptadas o cuenta inactiva; un token incorrecto debe devolver 403. La corrección de Security evita que el procesamiento secundario de /error convierta ese 403 en un 401 genérico.
