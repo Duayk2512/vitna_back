@@ -10,4 +10,9 @@ Seis roles con permisos en servidor, cuentas y productos, códigos de barras ún
 
 Pruebas: ./mvnw clean verify con DB_URL/DB_USER/DB_PASSWORD de una base PostgreSQL exclusiva de pruebas. No utilizar la base operativa. Última verificación local: 27 pruebas aprobadas y una de demostración omitida.
 
-Pendientes funcionales: recuperación de contraseña, fichas/fotos comerciales completas, comprobantes de pago, recetas/consumos/genealogía, kardex completo y auditoría persistente.
+Pendientes: activación comercial por enlace, completar fichas reales, reembolsos, conversión de unidades y conciliación de consumos por rendimiento.
+
+
+## Actualizacion operativa
+
+Ver [OPERATIONS.md](OPERATIONS.md) para Brevo, recuperacion y cambio de contraseña, auditoria, kardex, ajustes, devoluciones, recetas, consumos, comprobantes y fichas comerciales. V6 conserva las claves de prueba existentes.

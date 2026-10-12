@@ -11,6 +11,7 @@ public class Domain {
   public String passwordHash, phone, document, address;
   @Enumerated(EnumType.STRING) public Role role;
   public boolean active=true;
+  public long credentialVersion;
  }
  @Entity @Table(name="products") public static class Product {
   @Id @GeneratedValue(strategy=GenerationType.IDENTITY) public Long id;
@@ -19,10 +20,15 @@ public class Domain {
   @PrePersist void ensureBarcode(){if(barcode==null||barcode.isBlank())barcode=newBarcode();}
   static String newBarcode(){return "VT"+java.util.UUID.randomUUID().toString().replace("-", "").toUpperCase(java.util.Locale.ROOT);}
   public String name, category, presentation;
+  @Column(length=30) public String unit="unidad";
+  @Column(length=2000) public String ingredients;
+  @Column(length=1000) public String allergens,storageInfo;
+  @Column(length=100) public String netWeight;
   @Column(length=2000) public String description;
   public BigDecimal price=BigDecimal.ZERO;
   public boolean published;
   @Transient public BigDecimal availableStock;
+  @Transient public boolean hasPhoto;
  }
  @Entity @Table(name="lots") public static class Lot {
   @Id @GeneratedValue(strategy=GenerationType.IDENTITY) public Long id;
@@ -43,6 +49,8 @@ public class Domain {
   public String status="PENDIENTE_REVISION", address;
   @Version public long version;
   public BigDecimal total=BigDecimal.ZERO;
+  public java.time.Instant reservationExpiresAt;
+  @Column(length=1000) public String paymentNote;
  }
  @Entity @Table(name="order_lines") public static class OrderLine {
   @Id @GeneratedValue(strategy=GenerationType.IDENTITY) public Long id;

@@ -9,12 +9,18 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import java.util.List;
 @Configuration public class Security {
  @Bean PasswordEncoder encoder(){return new BCryptPasswordEncoder();}
+ static class SessionUser extends User {
+  final long credentialVersion;
+  SessionUser(com.vitna.Domain.Account account){super(account.email,account.passwordHash,account.active,true,true,true,List.of(new SimpleGrantedAuthority("ROLE_"+account.role)));credentialVersion=account.credentialVersion;}
+ }
  @Bean UserDetailsService users(Accounts accounts){return email -> {
   var a=accounts.findByEmailIgnoreCase(email.trim()).orElseThrow(()->new UsernameNotFoundException("Cuenta no encontrada"));
-  return new User(a.email,a.passwordHash,a.active,true,true,true,List.of(new SimpleGrantedAuthority("ROLE_"+a.role)));
+  return new SessionUser(a);
  };}
  @Bean @org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication(type=org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication.Type.SERVLET) SecurityFilterChain chain(HttpSecurity http,Accounts accounts,PasswordEncoder encoder,org.springframework.core.env.Environment environment) throws Exception {
-  return http.authorizeHttpRequests(a->a.requestMatchers("/api/public/**","/api/csrf").permitAll().anyRequest().authenticated())
+  return http.addFilterBefore(new AuthRateLimit(),org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter.class)
+   .addFilterBefore(new SessionGuard(accounts),org.springframework.security.web.access.intercept.AuthorizationFilter.class)
+   .authorizeHttpRequests(a->a.requestMatchers("/api/public/**","/api/csrf").permitAll().anyRequest().authenticated())
    .formLogin(f->f.loginProcessingUrl("/api/login").usernameParameter("email")
     .successHandler((q,s,a)->{s.setContentType("application/json");s.getWriter().write("{\"ok\":true}");})
     .failureHandler((q,s,e)->{
