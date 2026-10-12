@@ -6,12 +6,19 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import com.vitna.Domain.*;
 import java.math.BigDecimal;
 @Configuration public class Seed {
- @Bean CommandLineRunner initialData(Accounts users,Products products,PasswordEncoder encoder,org.springframework.core.env.Environment environment){return args->{
+ @Bean CommandLineRunner initialData(Accounts users,Products products,PasswordEncoder encoder,org.springframework.core.env.Environment environment,TestAccessProvisioner testAccess){return args->{
   boolean production=environment.matchesProfiles("prod");
   if(production && environment.matchesProfiles("demo","preview")) throw new IllegalStateException("Produccion no admite perfiles demo o preview");
   String password=System.getenv("VITNA_ADMIN_PASSWORD");
-  if(production && users.count()==0 && (password==null || password.length()<10)) throw new IllegalStateException("Configurar VITNA_ADMIN_PASSWORD de al menos 10 caracteres");
-  if(users.count()==0 && password!=null && password.length()>=10){Account a=new Account();a.email="admin@vitna.pe";a.name="Administración VITNA";a.role=Role.ADMIN;a.passwordHash=encoder.encode(password);users.save(a);}
+  boolean testAccessEnabled=environment.getProperty("VITNA_TEST_ACCESS_ENABLED",Boolean.class,false);
+  if(production && !testAccessEnabled && users.count()==0 && (password==null || password.length()<10)) throw new IllegalStateException("Configurar VITNA_ADMIN_PASSWORD de al menos 10 caracteres");
+  if(!testAccessEnabled && users.count()==0 && password!=null && password.length()>=10){Account a=new Account();a.email="admin@vitna.pe";a.name="Administración VITNA";a.role=Role.ADMIN;a.passwordHash=encoder.encode(password);users.save(a);}
+  if(testAccessEnabled){
+   var credentials=new java.util.EnumMap<Role,String>(Role.class);
+   for(Role role:Role.values()) credentials.put(role,environment.getProperty("VITNA_TEST_PASSWORD_"+role.name()));
+   testAccess.apply(credentials);
+   org.slf4j.LoggerFactory.getLogger(Seed.class).info("VITNA_TEST_ACCESS_APPLIED: seis cuentas destino configuradas; desactivar VITNA_TEST_ACCESS_ENABLED y retirar variables de prueba");
+  }
   if(environment.getProperty("VITNA_AUTH_DIAGNOSTICS",Boolean.class,false)) {
    String result=bootstrapDiagnostic(users,encoder,password);
    org.slf4j.LoggerFactory.getLogger(Seed.class).info("VITNA_AUTH_DIAGNOSTIC: {}",result);
