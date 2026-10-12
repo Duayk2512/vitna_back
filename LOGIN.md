@@ -1,5 +1,16 @@
 # Diagnóstico de acceso
 
+## Sin terminal: diagnostico desde el panel Railway
+
+En el servicio vitna_back, Variables, agregar VITNA_AUTH_DIAGNOSTICS=true y desplegar el ultimo commit. Abrir Deploy Logs y buscar VITNA_AUTH_DIAGNOSTIC. Este modo consulta la misma base del backend y compara el valor actual de VITNA_ADMIN_PASSWORD con el hash, sin imprimir secretos ni cambiar cuentas.
+
+- BOOTSTRAP_MATCH: la variable actual coincide con la cuenta almacenada. No demuestra que el navegador este enviando esa misma contrasena.
+- BOOTSTRAP_MISMATCH: la variable actual no coincide. Cambiarla no actualiza la contrasena de una cuenta ya creada.
+- ADMIN_NOT_FOUND, ADMIN_NOT_ACTIVE o HASH_FORMAT_INVALID: revisar el estado indicado antes de modificar contrasenas.
+- ACCOUNT_CHECK_FAILED: fallo de consulta o verificacion, distinto de una discrepancia de contrasena.
+
+Compartir solo esa linea del diagnostico. Desactivar la variable despues. No pegar secretos en SQL; el editor PostgreSQL no ejecuta comandos Java o Railway CLI.
+
 El administrador inicial usa **admin@vitna.pe**. Se crea únicamente cuando la tabla accounts está vacía y VITNA_ADMIN_PASSWORD tiene al menos 10 caracteres. La contraseña se almacena con BCrypt. Modificar esa variable y volver a desplegar NO actualiza una cuenta existente. Las cuentas demo del equipo local no se copian a Railway.
 
 Desde el frontend real, /api/csrf debe devolver JSON y establecer JSESSIONID bajo el dominio Vercel. Una respuesta 401 de /api/me sin sesión es normal. Un 401 de login con CSRF válido indica credenciales no aceptadas o cuenta inactiva; un token incorrecto debe devolver 403. La corrección de Security evita que el procesamiento secundario de /error convierta ese 403 en un 401 genérico.
